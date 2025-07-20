@@ -1,4 +1,5 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+# 以下是用ppo训练的脚本，使用的是llama3.2-3b模型，数据集是nq_search
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 #可用的gpu
 export DATA_DIR='data/nq_search'
 
 WAND_PROJECT='Search-R1'
@@ -31,13 +32,16 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
     data.val_files=$DATA_DIR/test.parquet \
     data.train_data_num=null \
     data.val_data_num=null \
-    data.train_batch_size=512 \
-    data.val_batch_size=256 \
-    data.max_prompt_length=4096 \
-    data.max_response_length=500 \
+    # 训练时每个gpu的batch size
+    data.train_batch_size=512 \ 
+    # 验证时每个gpu的batch size
+    data.val_batch_size=256 \ 
+    data.max_prompt_length=4096 \ 
+    data.max_response_length=500 \ 
     data.max_start_length=2048 \
     data.max_obs_length=500 \
     data.shuffle_train_dataloader=True \
+    # 用GAE作为奖励函数
     algorithm.adv_estimator=gae \
     actor_rollout_ref.model.path=$BASE_MODEL \
     actor_rollout_ref.actor.optim.lr=1e-6 \

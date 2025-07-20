@@ -100,13 +100,15 @@ class RewardManager():
 import ray
 import hydra
 
-
+# 用Hydra来管理配置，设置配置文件的路径和名称
 @hydra.main(config_path='config', config_name='ppo_trainer', version_base=None)
 def main(config):
+    # 如果ray没有初始化，则初始化本地Ray集群
     if not ray.is_initialized():
-        # this is for local ray cluster
+        # 启用tokenizers并行化，设置NCCL调试级别为WARN
         ray.init(runtime_env={'env_vars': {'TOKENIZERS_PARALLELISM': 'true', 'NCCL_DEBUG': 'WARN'}})
 
+    # 把main_task函数传入集群，并传递配置参数，执行分布式训练，等结束后通过ray.get获取结果
     ray.get(main_task.remote(config))
 
 
@@ -119,24 +121,32 @@ def main_task(config):
     from pprint import pprint
     from omegaconf import OmegaConf
     pprint(OmegaConf.to_container(config, resolve=True))  # resolve=True will eval symbol values
-    OmegaConf.resolve(config)
+    OmegaConf.resolve(config)#对配置对象进行解析，将配置中的符号替换为实际值
 
     # env_class = ENV_CLASS_MAPPING[config.env.name]
 
     # download the checkpoint from hdfs
+    # 从HDFS（分布式文件系统）下载模型检查点到本地，把本地路径赋值给local_path
     local_path = copy_local_path_from_hdfs(config.actor_rollout_ref.model.path)
 
-    # instantiate tokenizer
+    # 根据本地路径加载模型，实例化tokenizer
     from verl.utils import hf_tokenizer
     tokenizer = hf_tokenizer(local_path)
 
     # define worker classes
+    # 下面两种都是分布式训练，根据不同策略设置不同的工作组类
+    # 如果是fsdp
     if config.actor_rollout_ref.actor.strategy == 'fsdp':
+        # Actor和Critic必须使用相同的策略
         assert config.actor_rollout_ref.actor.strategy == config.critic.strategy
+        # 导入ActorRolloutRefWorker和CriticWorker
         from verl.workers.fsdp_workers import ActorRolloutRefWorker, CriticWorker
+        # 导入RayWorkerGroup
         from verl.single_controller.ray import RayWorkerGroup
+        # 设置ray_worker_group_cls为RayWorkerGroup
         ray_worker_group_cls = RayWorkerGroup
 
+    # 如果是megatron
     elif config.actor_rollout_ref.actor.strategy == 'megatron':
         assert config.actor_rollout_ref.actor.strategy == config.critic.strategy
         from verl.workers.megatron_workers import ActorRolloutRefWorker, CriticWorker
@@ -154,10 +164,12 @@ def main_task(config):
         Role.RefPolicy: ray.remote(ActorRolloutRefWorker),
     }
 
-    global_pool_id = 'global_pool'
+    global_pool_id = 'global_pool'  # 全局资源池
+    # 设置资源池规格，global_pool_id为全局资源池，[config.trainer.n_gpus_per_node] * config.trainer.nnodes为每个节点分配的gpu数量
     resource_pool_spec = {
         global_pool_id: [config.trainer.n_gpus_per_node] * config.trainer.nnodes,
     }
+    # 设置角色与资源池的映射关系，所有角色都使用同一个全局资源池，这意味着所有组件共享相同的GPU资源
     mapping = {
         Role.ActorRollout: global_pool_id,
         Role.Critic: global_pool_id,
@@ -170,22 +182,28 @@ def main_task(config):
     # - for code related prompt, we send to a sandbox if there are test cases
     # - finally, we combine all the rewards together
     # - The reward type depends on the tag of the data
-    if config.reward_model.enable:
-        if config.reward_model.strategy == 'fsdp':
-            from verl.workers.fsdp_workers import RewardModelWorker
+    if config.reward_model.enable:#如果启用奖励模型
+        if config.reward_model.strategy == 'fsdp':#如果奖励模型策略为fsdp
+            from verl.workers.fsdp_workers import RewardModelWorker#导入RewardModelWorker
         elif config.reward_model.strategy == 'megatron':
             from verl.workers.megatron_workers import RewardModelWorker
         else:
             raise NotImplementedError
+        # 把RewardModelWorker添加到角色与工作组的映射中
         role_worker_mapping[Role.RewardModel] = ray.remote(RewardModelWorker)
+        # 把RewardModel添加到角色与资源池的映射中
         mapping[Role.RewardModel] = global_pool_id
 
+    # 创建奖励管理器，传入tokenizer和num_examine（表示不打印调试信息）
     reward_fn = RewardManager(tokenizer=tokenizer, num_examine=0)
 
     # Note that we always use function-based RM for validation
+    # 创建验证用的奖励函数管理器，这里num_examine=1表示会打印1个批次的响应
     val_reward_fn = RewardManager(tokenizer=tokenizer, num_examine=1)
 
+    # 创建资源池管理器，根据配置中的资源池规格和映射关系，管理不同角色的GPU资源分配
     resource_pool_manager = ResourcePoolManager(resource_pool_spec=resource_pool_spec, mapping=mapping)
+    # 创建训练器，传入配置、tokenizer、角色与工作组的映射、资源池管理器、2个奖励函数
     trainer = RayPPOTrainer(config=config,
                             tokenizer=tokenizer,
                             role_worker_mapping=role_worker_mapping,
@@ -194,8 +212,8 @@ def main_task(config):
                             reward_fn=reward_fn,
                             val_reward_fn=val_reward_fn,
                             )
-    trainer.init_workers()
-    trainer.fit()
+    trainer.init_workers()  # 初始化所有工作组件，建立组件间的通信连接
+    trainer.fit()  # 开始训练
 
 
 if __name__ == '__main__':

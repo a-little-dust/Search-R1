@@ -1,3 +1,4 @@
+基于Ray框架实现多节点训练，包含两种节点类型：头节点(head node)和工作节点(worker node)
 
 ## Multinode Training
 
@@ -40,6 +41,8 @@ bash retrieval_launch.sh
 
 
 ### Step 3: Start the job
+
+只在头节点启动训练任务
 
 After the retrievers are launched, you can start the training job. You only need to start the job on the ***head*** node.
 

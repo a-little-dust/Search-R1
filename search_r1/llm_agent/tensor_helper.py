@@ -1,3 +1,4 @@
+# 这个文件负责处理张量操作，包括填充、连接、注意力掩码等
 import torch
 from typing import Dict, Tuple, List
 from dataclasses import dataclass

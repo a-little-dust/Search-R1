@@ -1,10 +1,11 @@
 
 ## Experiment log
 
-### Preliminary results 
+### Preliminary results 初步结果
 
 Resources: [wandb](https://wandb.ai/peterjin/Search-R1-open)
 
+仅在NQ数据集上使用PPO进行小规模实验，训练步数较少，学习率预热比例较大
 
 The preliminary experiment is conducted only on natural question (NQ) dataset (+ PPO) with a small number of training steps.
 
@@ -13,6 +14,7 @@ The preliminary experiment is conducted only on natural question (NQ) dataset (+
 
 Resources: [wandb](https://wandb.ai/peterjin/Search-R1-nq_hotpotqa_train), [docs](https://github.com/PeterGriffinJin/Search-R1/tree/main/scripts/nq_hotpotqa), [scripts](https://github.com/PeterGriffinJin/Search-R1/tree/main/scripts/nq_hotpotqa/v0.1)
 
+扩展到7个数据集，同时使用PPO和GRPO方法，仍然是小规模实验，学习率预热比例较大
 
 We extend the experiments from NQ to seven datasets with both PPO and GRPO methods. The studies are still on a small number of training steps with a big learning rate warm up ratio.
 
@@ -21,6 +23,7 @@ We extend the experiments from NQ to seven datasets with both PPO and GRPO metho
 
 Resources: [wandb](https://wandb.ai/peterjin/Search-R1-v0.2), [docs](https://github.com/PeterGriffinJin/Search-R1/tree/main/scripts/nq_hotpotqa), [scripts](https://github.com/PeterGriffinJin/Search-R1/tree/main/scripts/nq_hotpotqa/v0.2), [paper](https://arxiv.org/abs/2503.09516)
 
+解决了检索token掩码问题（大幅提升RL训练稳定性），并解决了GRPO样本索引问题
 
 We fix several bugs including [retrieved token masking](https://github.com/PeterGriffinJin/Search-R1/pull/21) and [GRPO sample indexing](https://github.com/PeterGriffinJin/Search-R1/commit/9ec2fa9892fbf0315d0c67b4dc08ae8f6cf5f378). 
 The former can largely improve the stablity of RL training. 
@@ -28,6 +31,9 @@ Then we adjust the training scripts, increasing the number of training steps and
 
 
 ### v0.3
+奖励设计：格式奖励、中间检索奖励
+
+搜索引擎：RL训练动态、推理时的泛化能力
 
 Resources: [wandb](https://wandb.ai/peterjin/Search-R1-v0.3), [docs](https://github.com/PeterGriffinJin/Search-R1/tree/main/scripts/nq_hotpotqa), [scripts](https://github.com/PeterGriffinJin/Search-R1/tree/main/scripts/nq_hotpotqa/v0.3), [paper](https://arxiv.org/abs/2505.15117)
 

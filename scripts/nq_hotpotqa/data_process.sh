@@ -3,6 +3,7 @@ LOCAL_DIR=$WORK_DIR/data/nq_hotpotqa_train
 
 ## process multiple dataset search format train file
 DATA=nq,hotpotqa
+# 用qa_search_train_merge.py处理训练数据
 python $WORK_DIR/scripts/data_process/qa_search_train_merge.py --local_dir $LOCAL_DIR --data_sources $DATA
 
 ## process multiple dataset search format test file

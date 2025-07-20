@@ -44,8 +44,11 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo_format \
     actor_rollout_ref.model.path=$BASE_MODEL \
     actor_rollout_ref.model.enable_gradient_checkpointing=true \
     actor_rollout_ref.model.use_remove_padding=True \
+    # 较小的学习率
     actor_rollout_ref.actor.optim.lr=5e-7 \
+    # 较长的预热比例
     actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.285 \
+    # 使用KL损失
     actor_rollout_ref.actor.use_kl_loss=true \
     actor_rollout_ref.actor.ppo_mini_batch_size=256 \
     actor_rollout_ref.actor.ppo_micro_batch_size=64 \
@@ -78,9 +81,13 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo_format \
     trainer.total_training_steps=1005 \
     trainer.default_hdfs_dir=null \
     trainer.default_local_dir=/home/peterjin/verl_checkpoints/$EXPERIMENT_NAME \
+    # 格式奖励
     reward_model.structure_format_score=0.2 \
+    # 最终格式奖励
     reward_model.final_format_score=0.1 \
+    # 检索奖励
     reward_model.retrieval_score=0 \
+    # 最大轮数
     max_turns=4 \
     retriever.url="http://127.0.0.1:8000/retrieve" \
     retriever.topk=3 \

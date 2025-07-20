@@ -20,7 +20,7 @@ gzip -d $save_path/wiki-18.jsonl.gz
 (2) Launch a local retrieval server.
 ```bash
 conda activate retriever
-bash retrieval_launch.sh
+bash retrieval_launch.sh #启动检索服务
 ```
 
 ### Run PPO training

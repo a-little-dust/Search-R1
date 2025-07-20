@@ -6,29 +6,31 @@ For local retrievers, we use [wiki-18](https://huggingface.co/datasets/PeterJinG
 
 ### How to choose the retriever?
 
-- If you have a private or domain-specific corpus, choose **local retriever**.
+- If you have a private or domain-specific corpus, choose **local retriever**本地检索器
 
-    - If there is no high quality embedding-based retrievers (dense retrievers) in your domain, choose **sparse local retriever** (e.g., BM25).
+    - If there is no high quality embedding-based retrievers (dense retrievers) in your domain, choose **sparse local retriever** (e.g., BM25).稀疏检索器（如BM25）适用于没有高质量嵌入检索器的领域。检索效率高，不需要GPU
 
-    - Otherwise choose **dense local retriever**.
+    - Otherwise choose **dense local retriever**.密集检索器（如E5）
     
-        - If you do not have sufficent GPUs to conduct exact dense embedding matching, choose **ANN indexing** on CPUs.
+        - If you do not have sufficent GPUs to conduct exact dense embedding matching, choose **ANN indexing** on CPUs. ANN索引：CPU上进行近似匹配，快速但可能不够准确
 
-        - If you have sufficient GPUs, choose **flat indexing** on GPUs.
-
-
-- If you want to train a general LLM search agent and have enough funding, choose **online search engine** (e.g., [SerpAPI](https://serpapi.com/)).
+        - If you have sufficient GPUs, choose **flat indexing** on GPUs.Flat索引：GPU上进行精确匹配，准确但较慢
 
 
-- If you have a domain specific online search engine (e.g., PubMed search), you can refer to [link](https://github.com/PeterGriffinJin/Search-R1/blob/main/search_r1/search/serp_search_server.py) to integrate it to Search-R1 by yourself.
+- If you want to train a general LLM search agent and have enough funding, choose **online search engine** (e.g., [SerpAPI](https://serpapi.com/)).在线搜索引擎，适用于训练通用LLM搜索代理
+
+
+- If you have a domain specific online search engine (e.g., PubMed search), you can refer to [link](https://github.com/PeterGriffinJin/Search-R1/blob/main/search_r1/search/serp_search_server.py) to integrate it to Search-R1 by yourself.推荐使用SerpAPI（集成多个搜索引擎，无月度配额限制）
 
 Search engine launching scripts can be found at [link](https://github.com/PeterGriffinJin/Search-R1/tree/main/example/retriever).
 
 ### Local Sparse Retriever
 
+本地稀疏检索器（BM25）
+
 Sparse retriever (e.g., bm25) is a traditional method. The retrieval process is very efficient and no GPUs are needed. However, it may not be as accurate as dense retrievers in some specific domain.
 
-(1) Download the indexing.
+(1) Download the indexing.下载预构建索引
 ```bash
 save_path=/your/path/to/save
 huggingface-cli download PeterJinGo/wiki-18-bm25-index --repo-type dataset --local-dir $save_path
