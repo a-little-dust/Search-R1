@@ -7,10 +7,11 @@
 
 ## 2. 技术要点与效果
 
-前提：对数据做预处理，在scripts\data_process\qa_search_train_merge.py
+前提：对数据做预处理，在scripts\data_process\qa_search_train_merge.py，这里还介绍了提示词
 
 ### 2.1 强化学习训练框架
 - **技术**：基于veRL框架实现PPO、GRPO等多种强化学习算法
+其中，GRPO的n_agent=5，意味着每个提示会生成5个不同的响应，然后计算组内均值和标准差，然后标准化，消除组间差异，突出组内相对表现
 - **效果**：成功训练3B/7B基础模型学会主动调用搜索引擎
 - **参考文件**：`train_ppo.sh`、`train_grpo.sh`、`verl/`目录
 值得注意的是，verl文件夹下都是字节实现的

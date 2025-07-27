@@ -35,11 +35,13 @@ class OnlineSearchConfig:
 
 
 # --- Utilities ---
+# 清洗snippet，去除特殊字符，保留空格
+# snippet指的是搜索结果的摘要，通常是几句话
 def parse_snippet(snippet: str) -> List[str]:
     segments = snippet.split("...")
     return [s.strip() for s in segments if len(s.strip().split()) > 5]
 
-
+# 清洗搜索词，去除特殊字符，保留空格
 def sanitize_search_query(query: str) -> str:
     # Remove or replace special characters that might cause issues.
     # This is a basic example; you might need to add more characters or patterns.
@@ -49,7 +51,7 @@ def sanitize_search_query(query: str) -> str:
 
     return sanitized_query
 
-
+# 过滤链接，只保留html,htm,shtml的链接
 def filter_links(search_results: List[Dict]) -> List[str]:
     links = []
     for result in search_results:
@@ -61,7 +63,7 @@ def filter_links(search_results: List[Dict]) -> List[str]:
                 links.append(item["link"])
     return links
 
-
+# 根据url，获取网页内容
 async def fetch(session: aiohttp.ClientSession, url: str, semaphore: asyncio.Semaphore) -> str:
     user_agents = [
         "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P)...",
@@ -72,15 +74,16 @@ async def fetch(session: aiohttp.ClientSession, url: str, semaphore: asyncio.Sem
 
     async with semaphore:
         try:
+            # 根据url，获取网页内容
             async with session.get(url, headers=headers) as response:
                 raw = await response.read()
-                detected = chardet.detect(raw)
+                detected = chardet.detect(raw)# 检测网页内容编码
                 encoding = detected["encoding"] or "utf-8"
-                return raw.decode(encoding, errors="ignore")
+                return raw.decode(encoding, errors="ignore")# 解码网页内容
         except (aiohttp.ClientError, asyncio.TimeoutError):
             return ""
 
-
+# 根据url列表，获取网页内容
 async def fetch_all(urls: List[str], limit: int = 8) -> List[str]:
     semaphore = asyncio.Semaphore(limit)
     timeout = aiohttp.ClientTimeout(total=5)
@@ -96,31 +99,32 @@ class OnlineSearchEngine:
     def __init__(self, config: OnlineSearchConfig):
         self.config = config
 
+    # 根据snippet和doc，整理上下文
     def collect_context(self, snippet: str, doc: str) -> str:
-        snippets = parse_snippet(snippet)
+        snippets = parse_snippet(snippet)#搜索结果的摘要
         ctx_paras = []
 
         for s in snippets:
-            pos = doc.replace("\n", " ").find(s)
+            pos = doc.replace("\n", " ").find(s)# 找到snippet在doc中的位置
             if pos == -1:
                 continue
             sta = pos
-            while sta > 0 and doc[sta] != "\n":
+            while sta > 0 and doc[sta] != "\n":  # 向前找到段落开始
                 sta -= 1
             end = pos + len(s)
-            while end < len(doc) and doc[end] != "\n":
+            while end < len(doc) and doc[end] != "\n":  # 向后找到段落结束
                 end += 1
             para = doc[sta:end].strip()
-            if para not in ctx_paras:
+            if para not in ctx_paras:# 如果para不在ctx_paras中，则添加到ctx_paras
                 ctx_paras.append(para)
 
         return "\n".join(ctx_paras)
 
     def fetch_web_content(self, search_results: List[Dict]) -> Dict[str, str]:
-        links = filter_links(search_results)
-        contents = asyncio.run(fetch_all(links))
+        links = filter_links(search_results)# 过滤链接
+        contents = asyncio.run(fetch_all(links))# 根据url列表，获取网页内容
         content_dict = {}
-        for html, link in zip(contents, links):
+        for html, link in zip(contents, links):# 遍历得到的html和url，将html转换为text，并保存到content_dict中
             soup = bs4.BeautifulSoup(html, "html.parser")
             text = "\n".join([p.get_text() for p in soup.find_all("p")])
             content_dict[link] = text
@@ -129,13 +133,15 @@ class OnlineSearchEngine:
     def search(self, search_term: str, num_iter: int = 1) -> List[Dict]:
         service = build('customsearch', 'v1', developerKey=self.config.api_key)
         results = []
-        sanitize_search_term = sanitize_search_query(search_term)
-        if search_term.isspace():
+        sanitize_search_term = sanitize_search_query(search_term)# 清洗搜索词，去除特殊字符，保留空格
+        if search_term.isspace():# 如果搜索词是空格，则返回空结果
             return results
+        # 调用google search api，获得搜索结果
         res = service.cse().list(q=sanitize_search_term, cx=self.config.cse_id).execute()
         results.append(res)
 
-        for _ in range(num_iter - 1):
+        # 当有更多结果时，API在响应中包含nextPage信息，则重复调用API，直到没有更多结果
+        for _ in range(num_iter - 1):#重复num_iter次，直到queries中没有nextPage
             if 'nextPage' not in res.get('queries', {}):
                 break
             start_idx = res['queries']['nextPage'][0]['startIndex']
@@ -145,14 +151,13 @@ class OnlineSearchEngine:
         return results
 
     def batch_search(self, queries: List[str]) -> List[List[str]]:
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor() as executor:  # 用线程池并行执行_retrieve_context
             return list(executor.map(self._retrieve_context, queries))
 
     def _retrieve_context(self, query: str) -> List[str]:
-        
-        if self.config.snippet_only:
-            search_results = self.search(query)
-            contexts = []
+        search_results = self.search(query)
+        contexts = []
+        if self.config.snippet_only:  # 如果只返回snippet，则直接调用search
             for result in search_results:
                 for item in result.get("items", []):
                     title = item.get("title", "")
@@ -164,8 +169,8 @@ class OnlineSearchEngine:
                             'document': {"contents": f'\"{title}\"\n{context}'},
                         })
         else:
+            # 通过fetch_web_content获得网页内容（txt）
             content_dict = self.fetch_web_content(search_results)
-            contexts = []
             for result in search_results:
                 for item in result.get("items", []):
                     link = item["link"]

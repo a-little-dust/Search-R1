@@ -29,6 +29,11 @@ def make_prefix(dp, template_type):
     # NOTE: also need to change reward_score/countdown.py
     if template_type == 'base':
         """This works for any base model"""
+        # 添加提示词，要求模型在回答问题之前，先进行推理，用<think>和</think>包裹推理过程
+        # 如果需要搜索，则使用<search>和</search>包裹查询语句
+        # 然后使用<information>和</information>包裹查询结果
+        # 可以搜索任意多次
+        # 最后使用<answer>和</answer>包裹答案。
         prefix = f"""Answer the given question. \
 You must conduct reasoning inside <think> and </think> first every time you get new information. \
 After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>. \

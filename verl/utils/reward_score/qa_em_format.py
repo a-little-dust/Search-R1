@@ -16,29 +16,29 @@ import re
 import string
 import random
 
-def normalize_answer(s):
-    def remove_articles(text):
+def normalize_answer(s):# 标准化答案
+    def remove_articles(text):# 移除a, an, the
         return re.sub(r"\b(a|an|the)\b", " ", text)
 
-    def white_space_fix(text):
+    def white_space_fix(text):# 移除空格
         return " ".join(text.split())
 
-    def remove_punc(text):
+    def remove_punc(text):# 移除标点符号
         exclude = set(string.punctuation)
         return "".join(ch for ch in text if ch not in exclude)
 
-    def lower(text):
+    def lower(text):# 转换为小写
         return text.lower()
 
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
 
-def em_check(prediction, golden_answers):
+def em_check(prediction, golden_answers):# 检查答案是否正确
     if isinstance(golden_answers, str):
         golden_answers = [golden_answers]
     normalized_prediction = normalize_answer(prediction)
     score = 0
-    for golden_answer in golden_answers:
+    for golden_answer in golden_answers:# 遍历所有正确答案，如果有一个答案和预测答案相同，则返回1，否则返回0
         golden_answer = normalize_answer(golden_answer)
         if golden_answer == normalized_prediction:
             score = 1
@@ -46,9 +46,9 @@ def em_check(prediction, golden_answers):
     return score
 
 
-def is_valid_sequence(text):
+def is_valid_sequence(text):# 检查整个过程是否符合格式
     # Find the position of "<|im_start|>assistant" with potential whitespace
-    assistant_pattern = r"<\|im_start\|>assistant\s*"
+    assistant_pattern = r"<\|im_start\|>assistant\s*"#正则表达式，匹配<|im_start|>assistant
     assistant_match = re.search(assistant_pattern, text)
     
     if not assistant_match:
@@ -63,14 +63,14 @@ def is_valid_sequence(text):
     for tag in tags_to_check:
         opening_count = len(re.findall(f"<{tag}>", content))
         closing_count = len(re.findall(f"</{tag}>", content))
-        if opening_count != closing_count:
+        if opening_count != closing_count:#判断每个标签是否成对出现，如果不成对就返回False
             return False, f"Mismatch in {tag} tags: {opening_count} opening vs {closing_count} closing tags"
     
     # Now check for proper sequence pattern and no extraneous content
     
     # 1. First split the content by any tags we recognize
     split_pattern = r"(</?(?:think|search|information|answer)>)"
-    parts = re.split(split_pattern, content)
+    parts = re.split(split_pattern, content)#用正则表达式分割content，得到一个列表，列表中每个元素是content中的一部分，每个部分可能是标签，也可能是内容
     
     # 2. Keep track of the current position in the expected sequence
     state = "start"  # start -> think -> search -> information -> think -> ... -> answer -> end
@@ -84,6 +84,7 @@ def is_valid_sequence(text):
         # Check if this is a tag
         if re.match(r"</?(?:think|search|information|answer)>", part):
             # This is a tag, check if it's valid in the current state
+            # 根据标签内容和state，判断是否符合格式，如果不符合就返回False
             if part == "<think>" and state in ["start", "information"]:
                 state = "in_think"
             elif part == "</think>" and state == "in_think":
@@ -121,7 +122,7 @@ def is_valid_sequence(text):
     return True, "Valid sequence format"
 
 
-def extract_solution(solution_str):
+def extract_solution(solution_str):# 提取answer标签中的内容
     """Extract the equation from the solution string."""
 
     answer_pattern = r'<answer>(.*?)</answer>'
@@ -136,21 +137,21 @@ def extract_solution(solution_str):
     return matches[-1].group(1).strip()
 
 
-def extract_information_blocks(text: str) -> list[str]:
+def extract_information_blocks(text: str) -> list[str]:# 提取information标签中的内容
     pattern = r"<information>(.*?)</information>"
     matches = re.findall(pattern, text, re.DOTALL)
     return [match.strip() for match in matches]
 
-
+# 判断检索是否正确
 def is_retrieval_correct(text: str, golden_answers: list[str]) -> list[str]:
-    seqs = extract_information_blocks(text)
-    for seq in seqs:
-        for golden_answer in golden_answers:
-            if normalize_answer(golden_answer) in normalize_answer(seq):
+    seqs = extract_information_blocks(text)# 提取information标签中的内容
+    for seq in seqs:# 遍历所有information标签中的内容
+        for golden_answer in golden_answers:# 遍历所有正确答案
+            if normalize_answer(golden_answer) in normalize_answer(seq):#如果通过RAG获得了正确答案，则返回True
                 return True
     return False
 
-
+# 计算分数，这个分数会用于强化学习
 def compute_score_em(solution_str, ground_truth, method='strict', structure_format_score=0, final_format_score=0, retrieval_score=0, format_score=0, score=1.):
     """The scoring function for exact match (EM).
 
@@ -161,9 +162,9 @@ def compute_score_em(solution_str, ground_truth, method='strict', structure_form
         format_score: the score for the format
         score: the score for the correct answer
     """
-    is_valid_format, _ = is_valid_sequence(solution_str)
+    is_valid_format, _ = is_valid_sequence(solution_str)  # 检查整个过程是否符合格式
     retrieval_correct = False
-    if is_valid_format:
+    if is_valid_format:#如果过程符合格式，那么判断检索是否正确
         retrieval_correct = is_retrieval_correct(solution_str, ground_truth['target'])
     answer = extract_solution(solution_str=solution_str)
     do_print = random.randint(1, 64) == 1
@@ -174,24 +175,24 @@ def compute_score_em(solution_str, ground_truth, method='strict', structure_form
         print(f"Extracted answer: {answer}")
         print(f"Solution string: {solution_str}")
             
-    if answer is None:
-        if is_valid_format:
-            if retrieval_correct:
+    if answer is None:#如果没找到答案
+        if is_valid_format:#如果过程符合格式
+            if retrieval_correct:#如果检索正确，那么返回结构化分数（这是固定的超参数，用于奖励过程正确）+检索分数（这是固定的超参数，用于奖励检索正确）
                 return structure_format_score + retrieval_score # 0.3
-            else:
+            else:#如果检索不正确，那么返回结构化分数
                 return structure_format_score # 0.2
         else:
-            return 0
-    else:
-        if em_check(answer, ground_truth['target']):
-            if is_valid_format:
+            return 0#如果过程不符合格式，那么返回0
+    else:#如果输出了答案
+        if em_check(answer, ground_truth['target']):#检查答案是否正确
+            if is_valid_format:#如果答案正确，且格式正确
                 return score # 1
-            else:
+            else:#答案正确但格式不正确，那么只扣掉结构化分数
                 return score - structure_format_score # 0.8
-        elif is_valid_format:
+        elif is_valid_format:#如果答案不正确，但格式正确
             if retrieval_correct:
                 return structure_format_score + retrieval_score # 0.3
             else:
                 return structure_format_score # 0.2
-        else:
+        else:#如果答案不正确，且格式不正确
             return final_format_score # 0.1

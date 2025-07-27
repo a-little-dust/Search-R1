@@ -43,6 +43,7 @@ class RerankerArguments:
     reranker_type: str = field(default="sentence_transformer")
 
 def get_reranker(config):
+    # 支持sentence_transformer
     if config.reranker_type == "sentence_transformer":
         return SentenceTransformerCrossEncoder.load(
             config.rerank_model_name_or_path,
@@ -56,6 +57,7 @@ def get_reranker(config):
 @app.post("/retrieve")
 def search_endpoint(request: SearchRequest):
     # Step 1: Retrieve documents
+    # 通过batch_search，检索出topk_retrieval个文档
     retrieved_docs = retriever.batch_search(
         query_list=request.queries,
         num=request.topk_retrieval,
@@ -63,6 +65,7 @@ def search_endpoint(request: SearchRequest):
     )
 
     # Step 2: Rerank
+    # 根据query和retrieved_docs，重排retrieved_docs，返回重排后的文档
     reranked = reranker.rerank(request.queries, retrieved_docs)
 
     # Step 3: Format response
@@ -110,14 +113,14 @@ if __name__ == "__main__":
         retrieval_use_fp16=True,
         retrieval_batch_size=512,
     )
-    retriever = get_retriever(retriever_config)
+    retriever = get_retriever(retriever_config)#构建检索器
 
     reranker_config = RerankerArguments(
         rerank_topk = args.reranking_topk,
         rerank_model_name_or_path = args.reranker_model,
         batch_size = args.reranker_batch_size,
     )
-    reranker = get_reranker(reranker_config)
+    reranker = get_reranker(reranker_config)#构建重排器
     
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
